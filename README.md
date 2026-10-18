@@ -2,7 +2,7 @@
 
 SystemInfo is a small Mac app that lives in your menu bar. It shows **CPU, RAM, disk and power consumption** at a glance and keeps a **history**, so you can see how these values change over time, including how much energy your Mac uses while it sleeps.
 
-> **Status: Beta (v0.1).** Things work, but expect rough edges. Feedback and bug reports are welcome in [Issues](https://github.com/Scharmen/IosSystemMonitor/issues).
+> **Status: Beta (v0.2).** Things work, but expect rough edges. Feedback and bug reports are welcome in [Issues](https://github.com/Scharmen/IosSystemMonitor/issues).
 
 ---
 
@@ -42,7 +42,7 @@ SystemInfo is a small Mac app that lives in your menu bar. It shows **CPU, RAM, 
 
 ## Installation
 
-1. Download **`SystemInfo-0.1.dmg`** from the [latest release](https://github.com/Scharmen/IosSystemMonitor/releases).
+1. Download **`SystemInfo-0.2.dmg`** from the [latest release](https://github.com/Scharmen/IosSystemMonitor/releases).
 2. Open the DMG and drag **SystemInfo** onto the **Applications** folder.
 3. Open SystemInfo from your Applications folder. It appears in the **menu bar** (top right), not in the Dock.
 
@@ -65,7 +65,7 @@ xattr -dr com.apple.quarantine /Applications/SystemInfo.app
 
 ### Start automatically at login (optional)
 
-**System Settings → General → Login Items → +**, then choose SystemInfo.
+Tick **Start at Login** in the panel. Untick it to remove SystemInfo from your login items again. You can also manage it in **System Settings → General → Login Items**.
 
 ---
 
@@ -80,6 +80,7 @@ xattr -dr com.apple.quarantine /Applications/SystemInfo.app
 | Look at a short time span in detail | Drag across any chart in the history; **Reset Zoom** goes back |
 | Set how long history is kept | **History Storage → Keep history for** at the bottom of the history window |
 | Delete all history | **Clear History…** at the bottom of the history window |
+| Start at login | Tick or untick **Start at Login** in the panel |
 | Quit | **Quit SystemInfo** in the panel (or ⌘Q while the panel is open) |
 
 ### About sleep and power
