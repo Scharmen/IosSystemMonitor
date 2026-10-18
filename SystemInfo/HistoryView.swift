@@ -36,6 +36,117 @@ enum HistoryRange: String, CaseIterable, Identifiable {
     }
 }
 
+/// Squeezes out the stretches without data (Mac asleep or shut down) so charts only show recorded time.
+/// Each removed stretch stays visible as a narrow band, so it's clear where the gaps were.
+struct GapTimeline {
+    struct Span {
+        let start: Date
+        let end: Date
+        /// Where this span starts on the squeezed time axis, in seconds from `origin`.
+        let offset: TimeInterval
+        var length: TimeInterval { end.timeIntervalSince(start) }
+    }
+
+    let spans: [Span]
+    /// Width of the band standing in for each removed gap, in seconds on the squeezed axis.
+    let gapWidth: TimeInterval
+    let origin: Date
+
+    /// Builds the timeline from chart points; returns `nil` without data. Gaps shorter than `minimumGap` are kept.
+    init?(points: [HistoryPoint], pointDuration: TimeInterval, minimumGap: TimeInterval = 600) {
+        guard let first = points.first else { return nil }
+        let threshold = max(3 * pointDuration, minimumGap)
+
+        var ranges: [(start: Date, end: Date)] = []
+        var start = first.date
+        var last = first.date
+        for point in points.dropFirst() {
+            if point.date.timeIntervalSince(last) > threshold {
+                ranges.append((start, last.addingTimeInterval(pointDuration)))
+                start = point.date
+            }
+            last = point.date
+        }
+        ranges.append((start, last.addingTimeInterval(pointDuration)))
+
+        // Never let a span run into the next one.
+        let ends = ranges.indices.map { index in
+            index + 1 < ranges.count ? min(ranges[index].end, ranges[index + 1].start) : ranges[index].end
+        }
+        let total = zip(ranges, ends).reduce(0) { $0 + $1.1.timeIntervalSince($1.0.start) }
+        let width = max(total * 0.015, 1)
+
+        var offset = 0.0
+        var spans: [Span] = []
+        for (range, end) in zip(ranges, ends) {
+            spans.append(Span(start: range.start, end: end, offset: offset))
+            offset += end.timeIntervalSince(range.start) + width
+        }
+        self.spans = spans
+        self.gapWidth = width
+        self.origin = first.date
+    }
+
+    var isCollapsed: Bool { spans.count > 1 }
+
+    var virtualDomain: ClosedRange<Date> {
+        let last = spans[spans.count - 1]
+        return origin...max(origin.addingTimeInterval(last.offset + last.length), origin.addingTimeInterval(1))
+    }
+
+    /// The position of a real date on the squeezed axis; dates inside a gap land inside that gap's band.
+    func virtual(_ date: Date) -> Date {
+        guard date > spans[0].start else { return origin }
+        for (index, span) in spans.enumerated() {
+            if date <= span.end {
+                if date >= span.start {
+                    return origin.addingTimeInterval(span.offset + date.timeIntervalSince(span.start))
+                }
+                let previous = spans[index - 1]
+                let gapLength = max(span.start.timeIntervalSince(previous.end), 1)
+                let fraction = date.timeIntervalSince(previous.end) / gapLength
+                return origin.addingTimeInterval(previous.offset + previous.length + gapWidth * fraction)
+            }
+        }
+        return virtualDomain.upperBound
+    }
+
+    /// The real date for a position on the squeezed axis.
+    func real(_ virtual: Date) -> Date {
+        let t = virtual.timeIntervalSince(origin)
+        guard t > 0 else { return spans[0].start }
+        for (index, span) in spans.enumerated() {
+            if t <= span.offset + span.length {
+                return span.start.addingTimeInterval(max(t - span.offset, 0))
+            }
+            if index + 1 < spans.count, t < spans[index + 1].offset {
+                let next = spans[index + 1]
+                let fraction = (t - (span.offset + span.length)) / gapWidth
+                return span.end.addingTimeInterval(fraction * next.start.timeIntervalSince(span.end))
+            }
+        }
+        return spans[spans.count - 1].end
+    }
+
+    /// The bands that stand in for removed gaps, on the squeezed axis.
+    var gapBands: [ClosedRange<Date>] {
+        spans.dropFirst().map { span in
+            let begin = origin.addingTimeInterval(span.offset - gapWidth)
+            return begin...origin.addingTimeInterval(span.offset)
+        }
+    }
+
+    /// Axis tick positions: the start of up to five spans, spread evenly.
+    var tickDates: [Date] {
+        let count = min(spans.count, 5)
+        guard count > 0 else { return [] }
+        return (0..<count).map { step in
+            let index = count == 1 ? 0 : step * (spans.count - 1) / (count - 1)
+            return origin.addingTimeInterval(spans[index].offset)
+        }
+    }
+}
+
 /// A fixed look-back period for the total energy use and cost, independent of the chart range.
 enum EnergyPeriod: CaseIterable, Identifiable {
     case day, week, month, halfYear, year
@@ -69,6 +180,12 @@ struct EnergyTotal: Identifiable {
     let wattHours: Double
     /// How much of the period has recorded power data, so partial totals can be recognised.
     let coveredDuration: TimeInterval
+    /// The part of `wattHours` used while the Mac slept, and how long it slept.
+    let sleepWattHours: Double
+    let sleepDuration: TimeInterval
+
+    /// Average power draw while asleep, in watts.
+    var sleepAverageWatts: Double? { sleepDuration > 0 ? sleepWattHours / (sleepDuration / 3600) : nil }
 
     var id: EnergyPeriod { period }
     var kilowattHours: Double { wattHours / 1000 }
@@ -224,6 +341,7 @@ struct HistoryView: View {
     /// Energy used in the visible range (including sleep), in watt-hours; `nil` if no power data.
     @State private var rangeEnergyWattHours: Double?
     @AppStorage("electricityPricePerKWh") private var pricePerKWh = 0.0
+    @AppStorage("historyHideGaps") private var hideGaps = false
 
     private static let maxChartPoints = 500
 
@@ -273,6 +391,7 @@ struct HistoryView: View {
                             points: points,
                             sleepPeriods: sleepPeriods,
                             domain: domain,
+                            timeline: hideGaps ? GapTimeline(points: points, pointDuration: pointDuration) : nil,
                             selectedPoint: selectedPoint,
                             selectedSleep: selectedSleep,
                             selectedDate: $selectedDate,
@@ -326,6 +445,8 @@ struct HistoryView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
+            Toggle("Hide gaps (asleep / off)", isOn: $hideGaps)
+                .toggleStyle(.checkbox)
             Text("Each point: \(Duration.seconds(pointDuration).formatted(.units(allowed: [.days, .hours, .minutes, .seconds], width: .wide, maximumUnitCount: 2)))")
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
@@ -434,6 +555,8 @@ struct HistoryView: View {
                     GridRow {
                         Text("").gridColumnAlignment(.leading)
                         Text("Energy")
+                        Text("Asleep")
+                        Text("Avg. Asleep")
                         Text("Cost")
                     }
                     .font(.subheadline)
@@ -443,13 +566,15 @@ struct HistoryView: View {
                         GridRow {
                             Text(total.isComplete ? total.period.title : "\(total.period.title)*")
                             Text("\(total.kilowattHours.formatted(.number.precision(.fractionLength(total.kilowattHours < 10 ? 2 : 1)))) kWh")
+                            Text(total.sleepDuration > 0 ? formattedEnergy(total.sleepWattHours) : "–")
+                            Text(total.sleepAverageWatts.map(formattedPower) ?? "–")
                             Text(pricePerKWh > 0 ? (total.kilowattHours * pricePerKWh).formatted(.currency(code: currency)) : "–")
                         }
                         .monospacedDigit()
                     }
                 }
 
-                Text("Includes the time your Mac was asleep. \(energyTotals.contains { !$0.isComplete } ? "* Not enough history recorded for the whole period yet, or your history setting keeps less data; the total only covers what was recorded. " : "")Enter your price per kWh to see costs.")
+                Text("Energy includes the time your Mac was asleep; \"Asleep\" is the part used during sleep and \"Avg. Asleep\" is the average power draw while asleep. \(energyTotals.contains { !$0.isComplete } ? "* Not enough history recorded for the whole period yet, or your history setting keeps less data; the total only covers what was recorded. " : "")Enter your price per kWh to see costs.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -599,13 +724,19 @@ struct HistoryView: View {
             let start = now.addingTimeInterval(-period.duration)
             var wattHours = 0.0
             var covered = 0.0
+            var sleepWattHours = 0.0
+            var sleepDuration = 0.0
             for sample in samples where sample.timestamp >= start {
                 guard let watts = sample.powerWatts else { continue }
                 let seconds = Double(sample.resolution)
                 wattHours += watts * seconds / 3600
                 covered += seconds
+                if sample.isSleep {
+                    sleepWattHours += watts * seconds / 3600
+                    sleepDuration += seconds
+                }
             }
-            return EnergyTotal(period: period, wattHours: wattHours, coveredDuration: covered)
+            return EnergyTotal(period: period, wattHours: wattHours, coveredDuration: covered, sleepWattHours: sleepWattHours, sleepDuration: sleepDuration)
         }
     }
 
@@ -624,6 +755,8 @@ private struct MetricChart: View {
     let points: [HistoryPoint]
     let sleepPeriods: [SleepPeriod]
     let domain: ClosedRange<Date>
+    /// When set, time without data is squeezed out of the chart.
+    let timeline: GapTimeline?
     let selectedPoint: HistoryPoint?
     let selectedSleep: SleepPeriod?
     @Binding var selectedDate: Date?
@@ -631,6 +764,11 @@ private struct MetricChart: View {
     let onZoom: (ClosedRange<Date>) -> Void
 
     private var isPowerChart: Bool { metric.title == "Power" }
+
+    /// Real date → chart position (identical unless gaps are hidden).
+    private func x(_ date: Date) -> Date { timeline?.virtual(date) ?? date }
+    private func real(_ chartDate: Date) -> Date { timeline?.real(chartDate) ?? chartDate }
+    private var chartDomain: ClosedRange<Date> { timeline?.virtualDomain ?? domain }
 
     private func sleepDescription(_ period: SleepPeriod) -> String {
         let time = "Asleep \(period.start.formatted(date: .abbreviated, time: .shortened)) – \(period.end.formatted(date: .omitted, time: .shortened)) (\(SleepPeriod.format(period.duration)))"
@@ -658,9 +796,16 @@ private struct MetricChart: View {
 
             Chart {
                 // Shade sleep periods behind the data, clipped to the visible range.
+                if let timeline {
+                    ForEach(Array(timeline.gapBands.enumerated()), id: \.offset) { _, band in
+                        RectangleMark(xStart: .value("Gap Start", band.lowerBound), xEnd: .value("Gap End", band.upperBound))
+                            .foregroundStyle(.gray.opacity(0.15))
+                    }
+                }
+
                 ForEach(sleepPeriods) { period in
-                    let start = max(period.start, domain.lowerBound)
-                    let end = min(period.end, domain.upperBound)
+                    let start = x(max(period.start, domain.lowerBound))
+                    let end = x(min(period.end, domain.upperBound))
                     RectangleMark(xStart: .value("Sleep Start", start), xEnd: .value("Sleep End", end))
                         .foregroundStyle(.indigo.opacity(selectedSleep?.id == period.id ? 0.2 : 0.1))
 
@@ -674,14 +819,14 @@ private struct MetricChart: View {
                 ForEach(points) { point in
                     if let value = metric.value(point) {
                         AreaMark(
-                            x: .value("Time", point.date),
+                            x: .value("Time", x(point.date)),
                             y: .value(metric.title, value),
                             series: .value("Segment", point.segment)
                         )
                         .foregroundStyle(metric.color.opacity(0.15))
 
                         LineMark(
-                            x: .value("Time", point.date),
+                            x: .value("Time", x(point.date)),
                             y: .value(metric.title, value),
                             series: .value("Segment", point.segment)
                         )
@@ -690,18 +835,33 @@ private struct MetricChart: View {
                 }
 
                 if let dragRange {
-                    RectangleMark(xStart: .value("Start", dragRange.lowerBound), xEnd: .value("End", dragRange.upperBound))
+                    RectangleMark(xStart: .value("Start", x(dragRange.lowerBound)), xEnd: .value("End", x(dragRange.upperBound)))
                         .foregroundStyle(.gray.opacity(0.2))
                 }
 
                 if let selectedPoint, let value = metric.value(selectedPoint) {
-                    RuleMark(x: .value("Selected", selectedPoint.date))
+                    RuleMark(x: .value("Selected", x(selectedPoint.date)))
                         .foregroundStyle(.secondary.opacity(0.5))
-                    PointMark(x: .value("Time", selectedPoint.date), y: .value(metric.title, value))
+                    PointMark(x: .value("Time", x(selectedPoint.date)), y: .value(metric.title, value))
                         .foregroundStyle(metric.color)
                 }
             }
-            .chartXScale(domain: domain)
+            .chartXScale(domain: chartDomain)
+            .chartXAxis {
+                if let timeline {
+                    AxisMarks(values: timeline.tickDates) { value in
+                        AxisGridLine()
+                        AxisTick()
+                        AxisValueLabel {
+                            if let date = value.as(Date.self) {
+                                Text(real(date).formatted(date: .abbreviated, time: .shortened))
+                            }
+                        }
+                    }
+                } else {
+                    AxisMarks()
+                }
+            }
             .chartYScale(domain: 0...metric.upperBound(points))
             .chartYAxis {
                 AxisMarks(values: .automatic(desiredCount: 4)) { value in
@@ -724,7 +884,7 @@ private struct MetricChart: View {
                         .onContinuousHover { phase in
                             switch phase {
                             case .active(let location):
-                                selectedDate = proxy.value(atX: location.x - originX, as: Date.self)
+                                selectedDate = proxy.value(atX: location.x - originX, as: Date.self).map(real)
                             case .ended:
                                 selectedDate = nil
                             }
@@ -734,7 +894,7 @@ private struct MetricChart: View {
                                 .onChanged { value in
                                     if let start = proxy.value(atX: value.startLocation.x - originX, as: Date.self),
                                        let current = proxy.value(atX: value.location.x - originX, as: Date.self) {
-                                        dragRange = min(start, current)...max(start, current)
+                                        dragRange = real(min(start, current))...real(max(start, current))
                                     }
                                 }
                                 .onEnded { _ in

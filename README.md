@@ -2,7 +2,7 @@
 
 SystemInfo is a small Mac app that lives in your menu bar. It shows **CPU, RAM, disk and power consumption** at a glance and keeps a **history**, so you can see how these values change over time, including how much energy your Mac uses while it sleeps.
 
-> **Status: Beta (v0.3).** Things work, but expect rough edges. Feedback and bug reports are welcome in [Issues](https://github.com/Scharmen/IosSystemMonitor/issues).
+> **Status: Beta (v0.4).** Things work, but expect rough edges. Feedback and bug reports are welcome in [Issues](https://github.com/Scharmen/IosSystemMonitor/issues).
 
 ---
 
@@ -19,7 +19,8 @@ SystemInfo is a small Mac app that lives in your menu bar. It shows **CPU, RAM, 
 - Charts for CPU, RAM, power and disk over **1 hour, 24 hours, 7 days, 30 days, 1 year or everything**
 - **Drag across a chart to zoom in**, down to individual 30-second values
 - Hover over a chart to see the exact time and value
-- **Energy & cost:** total energy (kWh) used in the last 24 hours, 7 days, 1 month, 6 months and 12 months. Enter your electricity price per kWh to see what it costs
+- **Hide gaps:** a checkbox squeezes out the time your Mac was asleep or off, so the charts only show recorded time (the gaps stay visible as narrow bands)
+- **Energy & cost:** total energy (kWh) used in the last 24 hours, 7 days, 1 month, 6 months and 12 months. Enter your electricity price per kWh to see what it costs. The table also shows the energy used while asleep and the average power draw during sleep
 - Summary with minimum, average, maximum and latest value, plus the energy used and cost for the selected range
 - **Sleep tracking:** every time your Mac sleeps you see when, how long, how much energy it used (Wh) and the average per hour of sleep
 
@@ -43,7 +44,7 @@ SystemInfo is a small Mac app that lives in your menu bar. It shows **CPU, RAM, 
 
 ## Installation
 
-1. Download **`SystemInfo-0.3.dmg`** from the [latest release](https://github.com/Scharmen/IosSystemMonitor/releases).
+1. Download **`SystemInfo-0.4.dmg`** from the [latest release](https://github.com/Scharmen/IosSystemMonitor/releases).
 2. Open the DMG and drag **SystemInfo** onto the **Applications** folder.
 3. Open SystemInfo from your Applications folder. It appears in the **menu bar** (top right), not in the Dock.
 
