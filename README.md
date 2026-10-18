@@ -20,7 +20,7 @@ SystemInfo is a small Mac app that lives in your menu bar. It shows **CPU, RAM, 
 - **Drag across a chart to zoom in**, down to individual 30-second values
 - Hover over a chart to see the exact time and value
 - **Energy & cost:** total energy (kWh) used in the last 24 hours, 7 days, 1 month, 6 months and 12 months. Enter your electricity price per kWh to see what it costs
-- Summary with minimum, average, maximum and latest value
+- Summary with minimum, average, maximum and latest value, plus the energy used and cost for the selected range
 - **Sleep tracking:** every time your Mac sleeps you see when, how long, how much energy it used (Wh) and the average per hour of sleep
 
 **Small storage footprint**

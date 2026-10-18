@@ -221,6 +221,8 @@ struct HistoryView: View {
     @State private var dragRange: ClosedRange<Date>?
     @State private var isConfirmingClear = false
     @State private var energyTotals: [EnergyTotal] = []
+    /// Energy used in the visible range (including sleep), in watt-hours; `nil` if no power data.
+    @State private var rangeEnergyWattHours: Double?
     @AppStorage("electricityPricePerKWh") private var pricePerKWh = 0.0
 
     private static let maxChartPoints = 500
@@ -359,6 +361,10 @@ struct HistoryView: View {
                 }
             }
 
+            if let energy = rangeEnergyWattHours {
+                energySummary(wattHours: energy)
+            }
+
             if !sleepPeriods.isEmpty {
                 sleepSummary
             }
@@ -366,6 +372,23 @@ struct HistoryView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(4)
         }
+    }
+
+    /// Energy used in the visible range and, once a price is set, what it cost.
+    private func energySummary(wattHours: Double) -> some View {
+        let kWh = wattHours / 1000
+        let energy = kWh.formatted(.number.precision(.fractionLength(kWh < 10 ? 2 : 1)))
+        let currency = Locale.current.currency?.identifier ?? "EUR"
+        return Label {
+            if pricePerKWh > 0 {
+                Text("Energy used \(energy) kWh · cost \((kWh * pricePerKWh).formatted(.currency(code: currency)))")
+            } else {
+                Text("Energy used \(energy) kWh · set a price per kWh under Energy & Cost to see the cost")
+            }
+        } icon: {
+            Image(systemName: "bolt.fill")
+        }
+        .foregroundStyle(.orange)
     }
 
     /// Total sleep time in the visible range and the average power while asleep.
@@ -550,6 +573,13 @@ struct HistoryView: View {
             .filter { $0.end >= start }
 
         loadEnergyTotals()
+
+        // Energy in the visible range: watts times covered seconds, plus the clipped part of each sleep.
+        let awakeEnergy = samples.compactMap { sample in sample.powerWatts.map { $0 * Double(sample.resolution) / 3600 } }
+        let sleepEnergy = sleepPeriods.compactMap { period in
+            period.powerWatts.map { $0 * max(min(period.end, end).timeIntervalSince(max(period.start, start)), 0) / 3600 }
+        }
+        rangeEnergyWattHours = awakeEnergy.isEmpty && sleepEnergy.isEmpty ? nil : (awakeEnergy + sleepEnergy).reduce(0, +)
 
         // Older data may be stored coarser than the chart buckets, so report whichever is larger.
         let bucketLength = HistoryPoint.bucketLength(from: start, to: end, maxPoints: Self.maxChartPoints)
