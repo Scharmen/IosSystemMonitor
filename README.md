@@ -2,7 +2,7 @@
 
 SystemInfo is a small Mac app that lives in your menu bar. It shows **CPU, RAM, disk and power consumption** at a glance and keeps a **history**, so you can see how these values change over time, including how much energy your Mac uses while it sleeps.
 
-> **Status: Beta (v0.2).** Things work, but expect rough edges. Feedback and bug reports are welcome in [Issues](https://github.com/Scharmen/IosSystemMonitor/issues).
+> **Status: Beta (v0.3).** Things work, but expect rough edges. Feedback and bug reports are welcome in [Issues](https://github.com/Scharmen/IosSystemMonitor/issues).
 
 ---
 
@@ -19,6 +19,7 @@ SystemInfo is a small Mac app that lives in your menu bar. It shows **CPU, RAM, 
 - Charts for CPU, RAM, power and disk over **1 hour, 24 hours, 7 days, 30 days, 1 year or everything**
 - **Drag across a chart to zoom in**, down to individual 30-second values
 - Hover over a chart to see the exact time and value
+- **Energy & cost:** total energy (kWh) used in the last 24 hours, 7 days, 1 month, 6 months and 12 months. Enter your electricity price per kWh to see what it costs
 - Summary with minimum, average, maximum and latest value
 - **Sleep tracking:** every time your Mac sleeps you see when, how long, how much energy it used (Wh) and the average per hour of sleep
 
@@ -42,7 +43,7 @@ SystemInfo is a small Mac app that lives in your menu bar. It shows **CPU, RAM, 
 
 ## Installation
 
-1. Download **`SystemInfo-0.2.dmg`** from the [latest release](https://github.com/Scharmen/IosSystemMonitor/releases).
+1. Download **`SystemInfo-0.3.dmg`** from the [latest release](https://github.com/Scharmen/IosSystemMonitor/releases).
 2. Open the DMG and drag **SystemInfo** onto the **Applications** folder.
 3. Open SystemInfo from your Applications folder. It appears in the **menu bar** (top right), not in the Dock.
 
@@ -79,9 +80,14 @@ Tick **Start at Login** in the panel. Untick it to remove SystemInfo from your l
 | Open the history | **Show History…** in the panel |
 | Look at a short time span in detail | Drag across any chart in the history; **Reset Zoom** goes back |
 | Set how long history is kept | **History Storage → Keep history for** at the bottom of the history window |
+| See energy use and cost | **Energy & Cost** in the history window; enter your price per kWh to calculate costs |
 | Delete all history | **Clear History…** at the bottom of the history window |
 | Start at login | Tick or untick **Start at Login** in the panel |
 | Quit | **Quit SystemInfo** in the panel (or ⌘Q while the panel is open) |
+
+### About energy and cost
+
+Energy totals add up the recorded power values, including sleep. They only cover time SystemInfo has recorded, and no further back than your **Keep history for** setting, so 6 and 12 months need a longer setting. Periods that aren't fully covered are marked with an asterisk.
 
 ### About sleep and power
 

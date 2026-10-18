@@ -36,6 +36,45 @@ enum HistoryRange: String, CaseIterable, Identifiable {
     }
 }
 
+/// A fixed look-back period for the total energy use and cost, independent of the chart range.
+enum EnergyPeriod: CaseIterable, Identifiable {
+    case day, week, month, halfYear, year
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .day: "24 Hours"
+        case .week: "7 Days"
+        case .month: "1 Month"
+        case .halfYear: "6 Months"
+        case .year: "12 Months"
+        }
+    }
+
+    var duration: TimeInterval {
+        switch self {
+        case .day: 86_400
+        case .week: 7 * 86_400
+        case .month: 30 * 86_400
+        case .halfYear: 182 * 86_400
+        case .year: 365 * 86_400
+        }
+    }
+}
+
+/// Energy used in one `EnergyPeriod`, summed from the recorded power samples.
+struct EnergyTotal: Identifiable {
+    let period: EnergyPeriod
+    let wattHours: Double
+    /// How much of the period has recorded power data, so partial totals can be recognised.
+    let coveredDuration: TimeInterval
+
+    var id: EnergyPeriod { period }
+    var kilowattHours: Double { wattHours / 1000 }
+    var isComplete: Bool { coveredDuration >= period.duration * 0.95 }
+}
+
 /// A time span during which the Mac was asleep.
 struct SleepPeriod: Identifiable {
     var id: Date { start }
@@ -181,6 +220,8 @@ struct HistoryView: View {
     @State private var selectedDate: Date?
     @State private var dragRange: ClosedRange<Date>?
     @State private var isConfirmingClear = false
+    @State private var energyTotals: [EnergyTotal] = []
+    @AppStorage("electricityPricePerKWh") private var pricePerKWh = 0.0
 
     private static let maxChartPoints = 500
 
@@ -237,6 +278,10 @@ struct HistoryView: View {
                             onZoom: zoom
                         )
                     }
+                }
+
+                if energyTotals.contains(where: { $0.wattHours > 0 }) {
+                    energyCost
                 }
 
                 if !sleepPeriods.isEmpty {
@@ -345,6 +390,50 @@ struct HistoryView: View {
             Image(systemName: "moon.zzz.fill")
         }
         .foregroundStyle(.indigo)
+    }
+
+    /// Total energy used over fixed periods, with the cost at the user's electricity price.
+    private var energyCost: some View {
+        let currency = Locale.current.currency?.identifier ?? "EUR"
+        return GroupBox("Energy & Cost") {
+            VStack(alignment: .leading, spacing: 10) {
+                LabeledContent("Electricity price per kWh") {
+                    HStack(spacing: 4) {
+                        TextField("Price", value: $pricePerKWh, format: .number.precision(.fractionLength(0...4)))
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 80)
+                        Text(currency)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Grid(alignment: .trailing, horizontalSpacing: 24, verticalSpacing: 6) {
+                    GridRow {
+                        Text("").gridColumnAlignment(.leading)
+                        Text("Energy")
+                        Text("Cost")
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                    ForEach(energyTotals) { total in
+                        GridRow {
+                            Text(total.isComplete ? total.period.title : "\(total.period.title)*")
+                            Text("\(total.kilowattHours.formatted(.number.precision(.fractionLength(total.kilowattHours < 10 ? 2 : 1)))) kWh")
+                            Text(pricePerKWh > 0 ? (total.kilowattHours * pricePerKWh).formatted(.currency(code: currency)) : "–")
+                        }
+                        .monospacedDigit()
+                    }
+                }
+
+                Text("Includes the time your Mac was asleep. \(energyTotals.contains { !$0.isComplete } ? "* Not enough history recorded for the whole period yet, or your history setting keeps less data; the total only covers what was recorded. " : "")Enter your price per kWh to see costs.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(4)
+        }
     }
 
     /// Every sleep in the visible range, newest first, with its energy use.
@@ -460,9 +549,34 @@ struct HistoryView: View {
             .map(SleepPeriod.init)
             .filter { $0.end >= start }
 
+        loadEnergyTotals()
+
         // Older data may be stored coarser than the chart buckets, so report whichever is larger.
         let bucketLength = HistoryPoint.bucketLength(from: start, to: end, maxPoints: Self.maxChartPoints)
         pointDuration = max(bucketLength, Double(samples.map(\.resolution).max() ?? 0)).rounded()
+    }
+
+    /// Sums power over the fixed energy periods: each sample's watts times the seconds it covers.
+    private func loadEnergyTotals() {
+        let now = Date.now
+        let longest = now.addingTimeInterval(-(EnergyPeriod.allCases.map(\.duration).max() ?? 0))
+        let descriptor = FetchDescriptor<MetricSample>(
+            predicate: #Predicate { $0.timestamp >= longest && $0.powerWatts != nil },
+            sortBy: [SortDescriptor(\.timestamp)]
+        )
+        let samples = (try? modelContext.fetch(descriptor)) ?? []
+        energyTotals = EnergyPeriod.allCases.map { period in
+            let start = now.addingTimeInterval(-period.duration)
+            var wattHours = 0.0
+            var covered = 0.0
+            for sample in samples where sample.timestamp >= start {
+                guard let watts = sample.powerWatts else { continue }
+                let seconds = Double(sample.resolution)
+                wattHours += watts * seconds / 3600
+                covered += seconds
+            }
+            return EnergyTotal(period: period, wattHours: wattHours, coveredDuration: covered)
+        }
     }
 
     /// Zooms into a dragged range; very short drags are treated as clicks and ignored.
