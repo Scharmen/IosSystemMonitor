@@ -1,0 +1,13 @@
+# Xcode
+build/
+DerivedData/
+xcuserdata/
+*.xcuserstate
+*.xccheckout
+*.moved-aside
+
+# Release artifacts
+dist/
+
+# macOS
+.DS_Store

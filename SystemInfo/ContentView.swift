@@ -6,77 +6,124 @@
 //
 
 import SwiftUI
-import SwiftData
 
+/// The popover shown when clicking the menu bar item.
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
+    let monitor: SystemMonitor
+
+    @Environment(\.openWindow) private var openWindow
+
+    @AppStorage(MenuBarSettingsKey.showCPU) private var showCPU = true
+    @AppStorage(MenuBarSettingsKey.showMemory) private var showMemory = true
+    @AppStorage(MenuBarSettingsKey.memoryStyle) private var memoryStyle = MemoryDisplayStyle.percentage
+    @AppStorage(MenuBarSettingsKey.showDisk) private var showDisk = false
+    @AppStorage(MenuBarSettingsKey.showPower) private var showPower = true
 
     var body: some View {
-        NavigationViewWrapper {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                    } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
+        VStack(alignment: .leading, spacing: 12) {
+            Text("System Info")
+                .font(.headline)
+
+            UsageRow(
+                title: "CPU",
+                systemImage: "cpu",
+                fraction: monitor.cpuUsage,
+                detail: monitor.cpuUsage.formatted(.percent.precision(.fractionLength(0)))
+            )
+
+            UsageRow(
+                title: "Memory",
+                systemImage: "memorychip",
+                fraction: fraction(monitor.memoryUsed, of: monitor.memoryTotal),
+                detail: "\(monitor.memoryUsed.formatted(.byteCount(style: .memory))) of \(monitor.memoryTotal.formatted(.byteCount(style: .memory))) · \(MemoryDisplayStyle.available.format(used: monitor.memoryUsed, total: monitor.memoryTotal))"
+            )
+
+            UsageRow(
+                title: "Disk",
+                systemImage: "internaldrive",
+                fraction: fraction(monitor.diskUsed, of: monitor.diskTotal),
+                detail: "\(monitor.diskUsed.formatted(.byteCount(style: .file))) of \(monitor.diskTotal.formatted(.byteCount(style: .file)))"
+            )
+
+            UsageRow(
+                title: "Power",
+                systemImage: "bolt.fill",
+                fraction: nil,
+                detail: monitor.powerWatts.map(formattedPower) ?? "Not available"
+            )
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Show in Menu Bar")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                Toggle("CPU", isOn: $showCPU)
+                HStack {
+                    Toggle("RAM", isOn: $showMemory)
+                    Spacer()
+                    Picker("RAM Display", selection: $memoryStyle) {
+                        ForEach(MemoryDisplayStyle.allCases) { style in
+                            Text(style.title).tag(style)
+                        }
                     }
+                    .labelsHidden()
+                    .fixedSize()
+                    .disabled(!showMemory)
                 }
-                .onDelete(perform: deleteItems)
+                Toggle("Disk", isOn: $showDisk)
+                Toggle("Power", isOn: $showPower)
+                    .disabled(monitor.powerWatts == nil)
             }
-#if os(macOS)
-            .navigationSplitViewColumnWidth(min: 180, ideal: 200)
-#endif
-            .toolbar {
-#if os(iOS)
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
+
+            Divider()
+
+            HStack {
+                Button("Show History…") {
+                    openWindow(id: HistoryView.windowID)
+                    // Menu bar apps aren't active by default, so bring the new window to the front.
+                    NSApplication.shared.activate()
                 }
-#endif
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
-                    }
+                Spacer()
+                Button("Quit SystemInfo") {
+                    NSApplication.shared.terminate(nil)
                 }
+                .keyboardShortcut("q")
             }
         }
+        .padding()
+        .frame(width: 320)
     }
 
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
-        }
-    }
-
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(items[index])
-            }
-        }
+    private func fraction(_ value: Int64, of total: Int64) -> Double {
+        total > 0 ? min(max(Double(value) / Double(total), 0), 1) : 0
     }
 }
 
-fileprivate struct NavigationViewWrapper<Content: View>: View {
-    let content: () -> Content
+private struct UsageRow: View {
+    let title: String
+    let systemImage: String
+    /// Fill level of the progress bar; pass `nil` for values without a natural maximum.
+    let fraction: Double?
+    let detail: String
 
     var body: some View {
-#if os(macOS)
-        NavigationSplitView {
-            content()
-        } detail: {
-            Text("Select an item")
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Label(title, systemImage: systemImage)
+                Spacer()
+                Text(detail)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+            if let fraction {
+                ProgressView(value: fraction)
+            }
         }
-#else
-        NavigationStack {
-            content()
-        }
-#endif
     }
 }
 
 #Preview {
-    ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
+    ContentView(monitor: SystemMonitor())
 }

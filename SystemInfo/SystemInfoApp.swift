@@ -10,23 +10,22 @@ import SwiftData
 
 @main
 struct SystemInfoApp: App {
-    var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            Item.self,
-        ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-
-        do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
-        } catch {
-            fatalError("Could not create ModelContainer: \(error)")
-        }
-    }()
+    /// Owns the live `SystemMonitor` and records its values into the history database.
+    @State private var recorder = HistoryRecorder()
 
     var body: some Scene {
-        WindowGroup {
-            ContentView()
+        MenuBarExtra {
+            ContentView(monitor: recorder.monitor)
+        } label: {
+            MenuBarLabel(monitor: recorder.monitor)
         }
-        .modelContainer(sharedModelContainer)
+        .menuBarExtraStyle(.window)
+
+        Window("History", id: HistoryView.windowID) {
+            HistoryView()
+                .environment(recorder)
+        }
+        .modelContainer(recorder.container)
+        .defaultLaunchBehavior(.suppressed)
     }
 }
