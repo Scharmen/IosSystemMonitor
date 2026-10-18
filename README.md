@@ -4,6 +4,21 @@ SystemInfo is a small Mac app that lives in your menu bar. It shows **CPU, RAM, 
 
 > **Status: Beta (v0.4).** Things work, but expect rough edges. Feedback and bug reports are welcome in [Issues](https://github.com/Scharmen/IosSystemMonitor/issues).
 
+
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/menubar.png" alt="Menu bar readout with CPU, memory, disk and power">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/panel.png" width="300" alt="The panel that opens from the menu bar">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/history.webp" alt="History window with summary, charts, and Energy & Cost">
+</p>
+
 ---
 
 ## Features
