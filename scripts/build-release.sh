@@ -26,11 +26,22 @@ xcodebuild \
 APP="build/Build/Products/Release/SystemInfo.app"
 mkdir -p dist/dmg
 
-# DMG with a shortcut to /Applications for drag-and-drop installation.
+# DMG with a shortcut to /Applications for drag-and-drop installation and a custom volume icon.
 cp -R "$APP" dist/dmg/
 ln -s /Applications dist/dmg/Applications
-hdiutil create -quiet -volname "SystemInfo $VERSION" -srcfolder dist/dmg -ov -format UDZO "dist/SystemInfo-$VERSION.dmg"
-rm -rf dist/dmg
+cp scripts/assets/SystemInfo.icns dist/dmg/.VolumeIcon.icns
+hdiutil create -quiet -volname "SystemInfo $VERSION" -srcfolder dist/dmg -ov -format UDRW dist/rw.dmg
+MOUNT=$(hdiutil attach -nobrowse dist/rw.dmg | awk -F'\t' '/\/Volumes\// { print $NF }')
+SetFile -a C "$MOUNT"
+hdiutil detach -quiet "$MOUNT"
+hdiutil convert -quiet dist/rw.dmg -format UDZO -o "dist/SystemInfo-$VERSION.dmg"
+rm -rf dist/dmg dist/rw.dmg
+# Give the DMG file itself the app icon too.
+sips -i scripts/assets/icon-1024.png >/dev/null
+DeRez -only icns scripts/assets/icon-1024.png > dist/icon.rsrc
+Rez -append dist/icon.rsrc -o "dist/SystemInfo-$VERSION.dmg"
+SetFile -a C "dist/SystemInfo-$VERSION.dmg"
+rm dist/icon.rsrc
 
 # ZIP as an alternative download.
 ditto -c -k --keepParent "$APP" "dist/SystemInfo-$VERSION.zip"

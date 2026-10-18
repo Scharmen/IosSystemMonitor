@@ -5,6 +5,7 @@
 //  Created by Kevin Krämer on 10/16/26.
 //
 
+import ServiceManagement
 import SwiftUI
 
 /// The popover shown when clicking the menu bar item.
@@ -18,6 +19,9 @@ struct ContentView: View {
     @AppStorage(MenuBarSettingsKey.memoryStyle) private var memoryStyle = MemoryDisplayStyle.percentage
     @AppStorage(MenuBarSettingsKey.showDisk) private var showDisk = false
     @AppStorage(MenuBarSettingsKey.showPower) private var showPower = true
+
+    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
+    @State private var launchAtLoginError: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -79,6 +83,18 @@ struct ContentView: View {
 
             Divider()
 
+            VStack(alignment: .leading, spacing: 4) {
+                Toggle("Start at Login", isOn: launchAtLoginBinding)
+                if let launchAtLoginError {
+                    Text(launchAtLoginError)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+            }
+            .onAppear { launchAtLogin = SMAppService.mainApp.status == .enabled }
+
+            Divider()
+
             HStack {
                 Button("Show History…") {
                     openWindow(id: HistoryView.windowID)
@@ -94,6 +110,26 @@ struct ContentView: View {
         }
         .padding()
         .frame(width: 320)
+    }
+
+    /// Registers or removes the app as a login item; the toggle always reflects the real system state.
+    private var launchAtLoginBinding: Binding<Bool> {
+        Binding(
+            get: { launchAtLogin },
+            set: { enable in
+                do {
+                    if enable {
+                        try SMAppService.mainApp.register()
+                    } else {
+                        try SMAppService.mainApp.unregister()
+                    }
+                    launchAtLoginError = nil
+                } catch {
+                    launchAtLoginError = error.localizedDescription
+                }
+                launchAtLogin = SMAppService.mainApp.status == .enabled
+            }
+        )
     }
 
     private func fraction(_ value: Int64, of total: Int64) -> Double {
