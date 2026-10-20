@@ -337,6 +337,10 @@ struct HistoryView: View {
     @State private var selectedDate: Date?
     @State private var dragRange: ClosedRange<Date>?
     @State private var isConfirmingClear = false
+    @AppStorage(HistoryRetention.yearsStorageKey) private var retentionYears = HistoryRetention.defaultYears
+    /// The years value being edited; only saved with "Apply" so stepping down doesn't delete data on the way.
+    @State private var draftYears = HistoryRetention.currentYears
+    @State private var isConfirmingYears = false
     @State private var energyTotals: [EnergyTotal] = []
     /// Energy used in the visible range (including sleep), in watt-hours; `nil` if no power data.
     @State private var rangeEnergyWattHours: Double?
@@ -629,12 +633,35 @@ struct HistoryView: View {
                 }
                 .fixedSize()
 
+                if retention == .years {
+                    HStack {
+                        Stepper("Keep history for \(draftYears) \(draftYears == 1 ? "year" : "years")", value: $draftYears, in: HistoryRetention.yearsRange)
+                        if draftYears != retentionYears {
+                            Button("Apply") {
+                                if draftYears < retentionYears {
+                                    isConfirmingYears = true
+                                } else {
+                                    applyYears()
+                                }
+                            }
+                            Button("Cancel") {
+                                draftYears = retentionYears
+                            }
+                        }
+                    }
+                    .confirmationDialog("Keep only \(draftYears) \(draftYears == 1 ? "year" : "years") of history?", isPresented: $isConfirmingYears) {
+                        Button("Delete Older Data", role: .destructive, action: applyYears)
+                    } message: {
+                        Text("Data older than that is deleted and can't be restored.")
+                    }
+                }
+
                 LabeledContent("Database size") {
                     Text("\(recorder.storeSize.formatted(.byteCount(style: .file))) · \(recorder.sampleCount.formatted()) samples")
                         .monospacedDigit()
                 }
 
-                Text("To keep storage small, older data is condensed automatically: 30-second values for the last 7 days, 15-minute averages up to 90 days, and hourly averages beyond that. Recording pauses when less than 1 GB of disk space is free.")
+                Text("To keep storage small, older data is condensed automatically: 30-second values for the last 7 days, 15-minute averages up to 90 days, and hourly averages beyond that, so each additional year takes only about 1 MB. Recording pauses when less than 1 GB of disk space is free.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -659,6 +686,12 @@ struct HistoryView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(4)
         }
+    }
+
+    private func applyYears() {
+        retentionYears = draftYears
+        recorder.performMaintenance()
+        load()
     }
 
     // MARK: - Loading

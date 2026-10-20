@@ -8,9 +8,13 @@ import SwiftData
 
 /// How long recorded history is kept.
 enum HistoryRetention: String, CaseIterable, Identifiable {
-    case day, week, month, threeMonths, year, unlimited
+    case day, week, month, threeMonths, year, years, unlimited
 
     static let storageKey = "history.retention"
+    /// Number of years kept when the retention is `.years`.
+    static let yearsStorageKey = "history.retentionYears"
+    static let yearsRange = 1...50
+    static let defaultYears = 10
 
     var id: Self { self }
 
@@ -21,6 +25,7 @@ enum HistoryRetention: String, CaseIterable, Identifiable {
         case .month: "1 Month"
         case .threeMonths: "3 Months"
         case .year: "1 Year"
+        case .years: "Custom (Years)"
         case .unlimited: "Unlimited"
         }
     }
@@ -34,8 +39,15 @@ enum HistoryRetention: String, CaseIterable, Identifiable {
         case .month: return 30 * day
         case .threeMonths: return 90 * day
         case .year: return 365 * day
+        case .years: return Double(Self.currentYears) * 365 * day
         case .unlimited: return nil
         }
+    }
+
+    /// The saved custom number of years, kept within `yearsRange`.
+    static var currentYears: Int {
+        let saved = UserDefaults.standard.object(forKey: yearsStorageKey) as? Int ?? defaultYears
+        return min(max(saved, yearsRange.lowerBound), yearsRange.upperBound)
     }
 
     static var current: HistoryRetention {
