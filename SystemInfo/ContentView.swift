@@ -19,6 +19,7 @@ struct ContentView: View {
     @AppStorage(MenuBarSettingsKey.memoryStyle) private var memoryStyle = MemoryDisplayStyle.percentage
     @AppStorage(MenuBarSettingsKey.showDisk) private var showDisk = false
     @AppStorage(MenuBarSettingsKey.showPower) private var showPower = true
+    @AppStorage(MenuBarSettingsKey.compact) private var compact = false
 
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var launchAtLoginError: String?
@@ -79,6 +80,8 @@ struct ContentView: View {
                 Toggle("Disk", isOn: $showDisk)
                 Toggle("Power", isOn: $showPower)
                     .disabled(monitor.powerWatts == nil)
+                Toggle("Compact Menu Bar", isOn: $compact)
+                    .padding(.top, 4)
             }
 
             Divider()

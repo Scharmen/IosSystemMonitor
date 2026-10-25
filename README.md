@@ -2,7 +2,7 @@
 
 SystemInfo is a small Mac app that lives in your menu bar. It shows **CPU, RAM, disk and power consumption** at a glance and keeps a **history**, so you can see how these values change over time, including how much energy your Mac uses while it sleeps.
 
-> **Status: Beta (v0.5).** Things work, but expect rough edges. Feedback and bug reports are welcome in [Issues](https://github.com/Scharmen/IosSystemMonitor/issues).
+> **Status: Beta (v0.6).** Things work, but expect rough edges. Feedback and bug reports are welcome in [Issues](https://github.com/Scharmen/IosSystemMonitor/issues).
 
 
 ## Screenshots
@@ -59,7 +59,7 @@ SystemInfo is a small Mac app that lives in your menu bar. It shows **CPU, RAM, 
 
 ## Installation
 
-1. Download **`SystemInfo-0.5.dmg`** from the [latest release](https://github.com/Scharmen/IosSystemMonitor/releases).
+1. Download **`SystemInfo-0.6.dmg`** from the [latest release](https://github.com/Scharmen/IosSystemMonitor/releases).
 2. Open the DMG and drag **SystemInfo** onto the **Applications** folder.
 3. Open SystemInfo from your Applications folder. It appears in the **menu bar** (top right), not in the Dock.
 

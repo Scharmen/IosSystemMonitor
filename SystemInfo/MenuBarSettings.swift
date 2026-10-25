@@ -12,6 +12,7 @@ enum MenuBarSettingsKey {
     static let memoryStyle = "menuBar.memoryStyle"
     static let showDisk = "menuBar.showDisk"
     static let showPower = "menuBar.showPower"
+    static let compact = "menuBar.compact"
 }
 
 /// How RAM usage is presented in the menu bar.
