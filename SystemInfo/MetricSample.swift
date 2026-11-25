@@ -8,7 +8,7 @@ import SwiftData
 
 /// One stored history entry: averaged system metrics over `resolution` seconds starting at `timestamp`.
 @Model
-final class MetricSample {
+nonisolated final class MetricSample {
     #Index<MetricSample>([\.timestamp])
 
     var timestamp: Date
@@ -23,8 +23,14 @@ final class MetricSample {
     /// `true` if this sample covers a period the Mac was asleep. Sleep samples are never merged
     /// with regular ones; their `powerWatts` is the average draw during sleep, if it could be determined.
     var isSleep: Bool = false
+    /// Lowest and highest CPU usage and power draw inside this sample's time span, so short spikes
+    /// survive averaging. `nil` for sleep samples and for samples recorded before version 1.0.
+    var cpuMin: Double?
+    var cpuMax: Double?
+    var powerMin: Double?
+    var powerMax: Double?
 
-    init(timestamp: Date, resolution: Int, cpuUsage: Double, memoryUsed: Int64, memoryTotal: Int64, diskUsed: Int64, diskTotal: Int64, powerWatts: Double?, isSleep: Bool = false) {
+    init(timestamp: Date, resolution: Int, cpuUsage: Double, memoryUsed: Int64, memoryTotal: Int64, diskUsed: Int64, diskTotal: Int64, powerWatts: Double?, isSleep: Bool = false, cpuMin: Double? = nil, cpuMax: Double? = nil, powerMin: Double? = nil, powerMax: Double? = nil) {
         self.timestamp = timestamp
         self.resolution = resolution
         self.cpuUsage = cpuUsage
@@ -34,6 +40,10 @@ final class MetricSample {
         self.diskTotal = diskTotal
         self.powerWatts = powerWatts
         self.isSleep = isSleep
+        self.cpuMin = cpuMin
+        self.cpuMax = cpuMax
+        self.powerMin = powerMin
+        self.powerMax = powerMax
     }
 
     /// Combines samples into one, weighting each by the time span it covers.
@@ -56,7 +66,12 @@ final class MetricSample {
             memoryTotal: samples.map(\.memoryTotal).max() ?? 0,
             diskUsed: Int64(mean { Double($0.diskUsed) }),
             diskTotal: samples.map(\.diskTotal).max() ?? 0,
-            powerWatts: powerWeight > 0 ? powered.reduce(0) { $0 + $1.0 * $1.1 } / powerWeight : nil
+            powerWatts: powerWeight > 0 ? powered.reduce(0) { $0 + $1.0 * $1.1 } / powerWeight : nil,
+            // Samples without recorded extremes count with their average, so the range never shrinks.
+            cpuMin: samples.map { $0.cpuMin ?? $0.cpuUsage }.min(),
+            cpuMax: samples.map { $0.cpuMax ?? $0.cpuUsage }.max(),
+            powerMin: samples.compactMap { $0.powerMin ?? $0.powerWatts }.min(),
+            powerMax: samples.compactMap { $0.powerMax ?? $0.powerWatts }.max()
         )
     }
 }

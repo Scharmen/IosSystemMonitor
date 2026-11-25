@@ -19,6 +19,8 @@ SystemInfo is a small Mac app that lives in your menu bar. It shows **CPU, RAM, 
   <img src="docs/screenshots/history.webp" alt="History window with summary, charts, and Energy & Cost">
 </p>
 
+*The history screenshot shows version 0.6. The history window has since been redesigned with a sidebar (Overview, Energy, Sleep).*
+
 ---
 
 ## Features
@@ -31,18 +33,19 @@ SystemInfo is a small Mac app that lives in your menu bar. It shows **CPU, RAM, 
 **Click the menu bar item** to see all values with progress bars, the menu bar settings, and the **Show History…** button.
 
 **History window**
-- Charts for CPU, RAM, power and disk over **1 hour, 24 hours, 7 days, 30 days, 1 year or everything**
-- **Drag across a chart to zoom in**, down to individual 30-second values
-- Hover over a chart to see the exact time and value
-- **Hide gaps:** a checkbox squeezes out the time your Mac was asleep or off, so the charts only show recorded time (the gaps stay visible as narrow bands)
-- **Energy & cost:** total energy (kWh) used in the last 24 hours, 7 days, 1 month, 6 months and 12 months. Enter your electricity price per kWh to see what it costs. The table also shows the energy used while asleep and the average power draw during sleep
-- Summary with minimum, average, maximum and latest value, plus the energy used and cost for the selected range
-- **Sleep tracking:** every time your Mac sleeps you see when, how long, how much energy it used (Wh) and the average per hour of sleep
+- One toolbar sets the time span for everything: **1 hour, 24 hours, 7 days, 30 days, 1 year or everything**, with arrows to step back and forward in time
+- **Overview:** cards with the key values (CPU, memory, power, energy and cost, disk, time asleep) and charts for CPU, power and memory
+- **Drag across a chart to zoom in**, down to individual 30-second values; **Zoom Out** goes back one step. Swipe sideways with two fingers to move through time
+- Hover over a chart to see the exact time and value right next to the mouse, on all charts at once
+- The lighter band around each line shows the **lowest and highest value**, so short spikes stay visible even over long time spans
+- **Hide gaps:** squeezes out the time your Mac was asleep or off, so the charts only show recorded time (the gaps stay visible as narrow bands)
+- **Energy:** a bar chart of the energy used per hour, day or month, split into awake and asleep, with totals and cost for the selected time span
+- **Sleep:** a sortable table of every sleep with when, how long, how much energy it used (Wh) and the average power
 
 **Small storage footprint**
 - The last **7 days** are kept in full detail (one value every 30 seconds)
 - After that, older data is automatically condensed into **15-minute** averages (up to 90 days), then **hourly** averages
-- **A whole year of history takes about 5 MB**, and every additional year about 1 MB more
+- **A whole year of history takes about 6 MB**, and every additional year a bit more than 1 MB
 - You choose how long history is kept: 1 day, 1 week, 1 month, 3 months, 1 year, **a custom number of years (1–50)** or unlimited
 - Recording pauses automatically if your disk has less than 1 GB free
 
@@ -94,16 +97,18 @@ Tick **Start at Login** in the panel. Untick it to remove SystemInfo from your l
 | Change what's in the menu bar | Tick or untick **CPU / RAM / Disk / Power** in the panel |
 | Change how RAM is shown | Use the drop-down next to **RAM** |
 | Open the history | **Show History…** in the panel |
-| Look at a short time span in detail | Drag across any chart in the history; **Reset Zoom** goes back |
-| Set how long history is kept | **History Storage → Keep history for** at the bottom of the history window |
-| See energy use and cost | **Energy & Cost** in the history window; enter your price per kWh to calculate costs |
-| Delete all history | **Clear History…** at the bottom of the history window |
+| Look at a short time span in detail | Drag across any chart in the history; **Zoom Out** in the toolbar goes back |
+| Look at an earlier time | The arrows in the history toolbar, or swipe sideways over a chart |
+| See energy use and cost | **Energy** in the sidebar of the history window |
+| Set your electricity price | **Settings…** in the panel (or the gear in the history window) |
+| Set how long history is kept | **Settings… → History Storage → Keep history for** |
+| Delete all history | **Settings… → Clear History…** |
 | Start at login | Tick or untick **Start at Login** in the panel |
-| Quit | **Quit SystemInfo** in the panel (or ⌘Q while the panel is open) |
+| Quit | **Quit** in the panel (or ⌘Q while the panel is open) |
 
 ### About energy and cost
 
-Energy totals add up the recorded power values, including sleep. They only cover time SystemInfo has recorded, and no further back than your **Keep history for** setting, so 6 and 12 months need a longer setting. Periods that aren't fully covered are marked with an asterisk.
+Energy totals add up the recorded power values, including sleep, for the time span selected in the toolbar. They only cover time SystemInfo has recorded, and no further back than your **Keep history for** setting, so a full year needs a longer setting. If the time span isn't fully covered, the Energy page says how much of it was recorded.
 
 ### About sleep and power
 
@@ -143,7 +148,17 @@ The files are written to the `dist/` folder.
 | `SystemMonitor.swift` | Reads CPU, memory, disk and power from macOS |
 | `HistoryRecorder.swift` | Saves values every 30 seconds, condenses old data, tracks sleep |
 | `MetricSample.swift` | The data model for one stored value (SwiftData) |
-| `HistoryView.swift` | The history window with charts, zoom and sleep list |
+| `History/HistoryView.swift` | The history window: sidebar, toolbar and time span |
+| `History/HistoryStore.swift` | Which time span is shown; zooming, paging and panning |
+| `History/HistoryLoader.swift` | Reads the database in the background and prepares charts, totals and energy bars |
+| `History/HistoryModels.swift` | The value types the history window works with |
+| `History/OverviewPage.swift`, `EnergyPage.swift`, `SleepPage.swift` | The three pages of the history window |
+| `History/MetricChart.swift` | One chart with tooltip, zoom selection and min–max band |
+| `History/MouseTrackingView.swift` | Mouse position and dragging over a chart |
+| `History/GapTimeline.swift` | The squeezed time axis for "Hide gaps" |
+| `SettingsView.swift` | The Settings window: electricity price and history storage |
+| `AppWindows.swift` | Brings the History and Settings windows to the front |
+| `DemoData.swift` | Debug builds only: generated history for trying things out and for screenshots |
 | `MenuBarLabel.swift` | What's drawn in the menu bar |
 | `ContentView.swift` | The panel that opens from the menu bar |
 | `MenuBarSettings.swift` | Menu bar options and RAM display formats |

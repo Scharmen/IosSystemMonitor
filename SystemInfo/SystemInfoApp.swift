@@ -13,6 +13,14 @@ struct SystemInfoApp: App {
     /// Owns the live `SystemMonitor` and records its values into the history database.
     @State private var recorder = HistoryRecorder()
 
+    private var showsHistoryAtLaunch: Bool {
+        #if DEBUG
+        DemoData.showsHistoryAtLaunch
+        #else
+        false
+        #endif
+    }
+
     var body: some Scene {
         MenuBarExtra {
             ContentView(monitor: recorder.monitor)
@@ -22,10 +30,15 @@ struct SystemInfoApp: App {
         .menuBarExtraStyle(.window)
 
         Window("History", id: HistoryView.windowID) {
-            HistoryView()
+            HistoryView(container: recorder.container)
                 .environment(recorder)
         }
-        .modelContainer(recorder.container)
-        .defaultLaunchBehavior(.suppressed)
+        .defaultSize(width: 1100, height: 760)
+        .defaultLaunchBehavior(showsHistoryAtLaunch ? .presented : .suppressed)
+
+        Settings {
+            SettingsView()
+                .environment(recorder)
+        }
     }
 }

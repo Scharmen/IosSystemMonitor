@@ -16,9 +16,29 @@ struct MenuBarLabel: View {
     @AppStorage(MenuBarSettingsKey.showPower) private var showPower = true
     @AppStorage(MenuBarSettingsKey.compact) private var compact = false
 
+    /// The last rendered menu bar image. It is rendered in `task(id:)` rather than in `body`:
+    /// `body` runs while AppKit lays out the status item, and rendering there starts a nested
+    /// layout pass ("It's not legal to call -layoutSubtreeIfNeeded on a view which is already
+    /// being laid out").
+    @State private var image: NSImage?
+
     var body: some View {
-        Image(nsImage: renderedImage)
-            .accessibilityLabel(segments.isEmpty ? "System Info" : segments.map(\.text).joined(separator: ", "))
+        Group {
+            if let image {
+                Image(nsImage: image)
+            } else {
+                Image(systemName: "gauge.with.dots.needle.33percent")
+            }
+        }
+        .accessibilityLabel(segments.isEmpty ? "System Info" : segments.map(\.text).joined(separator: ", "))
+        .task(id: RenderKey(segments: segments, compact: compact)) {
+            image = renderedImage
+        }
+    }
+
+    private struct RenderKey: Hashable {
+        let segments: [MenuBarSegment]
+        let compact: Bool
     }
 
     private var segments: [MenuBarSegment] {
@@ -94,7 +114,7 @@ private struct MenuBarSegmentsView: View {
 }
 
 /// Formats a wattage like "10.5 W".
-func formattedPower(_ watts: Double) -> String {
+nonisolated func formattedPower(_ watts: Double) -> String {
     Measurement(value: watts, unit: UnitPower.watts)
         .formatted(.measurement(width: .abbreviated, usage: .asProvided, numberFormatStyle: .number.precision(.fractionLength(1))))
 }

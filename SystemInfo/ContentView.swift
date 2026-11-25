@@ -13,6 +13,7 @@ struct ContentView: View {
     let monitor: SystemMonitor
 
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
 
     @AppStorage(MenuBarSettingsKey.showCPU) private var showCPU = true
     @AppStorage(MenuBarSettingsKey.showMemory) private var showMemory = true
@@ -99,13 +100,10 @@ struct ContentView: View {
             Divider()
 
             HStack {
-                Button("Show History…") {
-                    openWindow(id: HistoryView.windowID)
-                    // Menu bar apps aren't active by default, so bring the new window to the front.
-                    NSApplication.shared.activate()
-                }
+                Button("Show History…", action: showHistory)
+                Button("Settings…", action: showSettings)
                 Spacer()
-                Button("Quit SystemInfo") {
+                Button("Quit") {
                     NSApplication.shared.terminate(nil)
                 }
                 .keyboardShortcut("q")
@@ -113,6 +111,16 @@ struct ContentView: View {
         }
         .padding()
         .frame(width: 320)
+    }
+
+    private func showHistory() {
+        openWindow(id: HistoryView.windowID)
+        AppWindows.bringToFront(HistoryView.windowID)
+    }
+
+    private func showSettings() {
+        openSettings()
+        AppWindows.bringToFront(AppWindows.settingsIdentifier)
     }
 
     /// Registers or removes the app as a login item; the toggle always reflects the real system state.

@@ -70,9 +70,11 @@ final class HistoryRecorder {
     private(set) var isPausedForLowDiskSpace = false
     private(set) var sampleCount = 0
     private(set) var storeSize: Int64 = 0
+    /// Goes up whenever the stored history changes, so open windows know to reload.
+    private(set) var revision = 0
 
     /// Fresh samples cover 30 seconds and are kept at that detail for the first compaction tier's age.
-    static let sampleResolution = 30
+    nonisolated static let sampleResolution = 30
     /// Samples older than `age` are merged into averages covering `resolution` seconds.
     private static let compactionTiers: [(age: TimeInterval, resolution: Int)] = [
         (age: 7 * 86_400, resolution: 15 * 60),
@@ -100,7 +102,11 @@ final class HistoryRecorder {
 
     init() {
         do {
+            #if DEBUG
+            container = try DemoData.isEnabled ? DemoData.makeContainer() : ModelContainer(for: MetricSample.self)
+            #else
             container = try ModelContainer(for: MetricSample.self)
+            #endif
         } catch {
             // Keep the app usable even if the store can't be opened; history just won't persist.
             container = try! ModelContainer(for: MetricSample.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
@@ -198,6 +204,7 @@ final class HistoryRecorder {
 
                 sample.powerWatts = (after.accumulatedLoad - before.accumulatedLoad) / readings / 1000
                 try? self.context.save()
+                self.revision += 1
                 return
             }
         }
@@ -243,7 +250,11 @@ final class HistoryRecorder {
             memoryTotal: last.memoryTotal,
             diskUsed: last.diskUsed,
             diskTotal: last.diskTotal,
-            powerWatts: powerValues.isEmpty ? nil : powerValues.reduce(0, +) / Double(powerValues.count)
+            powerWatts: powerValues.isEmpty ? nil : powerValues.reduce(0, +) / Double(powerValues.count),
+            cpuMin: pending.map(\.cpuUsage).min(),
+            cpuMax: pending.map(\.cpuUsage).max(),
+            powerMin: powerValues.min(),
+            powerMax: powerValues.max()
         ))
         try? context.save()
         refreshStorageInfo()
@@ -302,6 +313,7 @@ final class HistoryRecorder {
     }
 
     private func refreshStorageInfo() {
+        revision += 1
         sampleCount = (try? context.fetchCount(FetchDescriptor<MetricSample>())) ?? 0
 
         // SQLite keeps data in the main file plus write-ahead log files next to it.
